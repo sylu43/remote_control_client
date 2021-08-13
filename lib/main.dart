@@ -1,5 +1,7 @@
 import 'dart:convert';
+//import 'dart:html';
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'package:http/http.dart' as http;
 
 //enum OP { UP, DOWN, STOP, LOCK }
@@ -8,9 +10,25 @@ void main() => runApp(MyApp());
 class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'Remote Controller',
-      home: Controller(),
+    return Provider<KeyCheck>(
+        create: (context) => KeyCheck(),
+        child: MaterialApp(title: "controller", home: Controller()));
+  }
+}
+
+class KeyCheck extends StatefulWidget {
+  @override
+  _KeyCheckState createState() => _KeyCheckState();
+  //void dispose() {}
+}
+
+class _KeyCheckState extends State<KeyCheck> {
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: Text('Checking key...'),
+      ),
     );
   }
 }
