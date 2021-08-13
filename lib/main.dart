@@ -1,6 +1,8 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
 
-enum OP { UP, DOWN, STOP, LOCK }
+//enum OP { UP, DOWN, STOP, LOCK }
 void main() => runApp(MyApp());
 
 class MyApp extends StatelessWidget {
@@ -19,6 +21,8 @@ class Controller extends StatefulWidget {
 }
 
 class _ControllerState extends State<Controller> {
+  final ip = '218.161.107.174';
+  final port = '5000';
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -44,8 +48,8 @@ class _ControllerState extends State<Controller> {
               child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          _buttonBuilder(OP.UP, Icons.arrow_upward),
-          _buttonBuilder(OP.DOWN, Icons.arrow_downward)
+          _buttonBuilder('up', Icons.arrow_upward),
+          _buttonBuilder('down', Icons.arrow_downward)
         ],
       ))),
       Expanded(
@@ -53,13 +57,13 @@ class _ControllerState extends State<Controller> {
               child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-            _buttonBuilder(OP.STOP, Icons.stop),
-            _buttonBuilder(OP.LOCK, Icons.lock)
+            _buttonBuilder('stop', Icons.stop),
+            _buttonBuilder('lock', Icons.lock)
           ])))
     ]));
   }
 
-  Widget _buttonBuilder(OP op, IconData icon) {
+  Widget _buttonBuilder(String op, IconData icon) {
     return Expanded(
         child: IconButton(
       onPressed: () => onPressed(op),
@@ -68,7 +72,21 @@ class _ControllerState extends State<Controller> {
     ));
   }
 
-  void onPressed(OP op) {}
+  void onPressed(String op) {
+    sendGateOp(op);
+  }
 
   void _enterAdminPage() {}
+
+  Future<http.Response> sendGateOp(String op) {
+    return http.post(
+      Uri.http(ip + ':' + port, '/gate_op'),
+      headers: <String, String>{
+        'Content-Type': 'application/json; charset=UTF-8',
+      },
+      body: jsonEncode(<String, String>{
+        'op': op,
+      }),
+    );
+  }
 }

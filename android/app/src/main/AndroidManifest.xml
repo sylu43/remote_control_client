@@ -1,5 +1,6 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     package="com.example.remote_control_server">
+    <uses-permission android:name="android.permission.INTERNET"/>
    <application
         android:label="remote_control_server"
         android:icon="@mipmap/ic_launcher">
