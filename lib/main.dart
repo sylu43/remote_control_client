@@ -1,8 +1,9 @@
 import 'dart:convert';
-//import 'dart:html';
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:http/http.dart' as http;
+import 'package:fluttertoast/fluttertoast.dart';
 
 //enum OP { UP, DOWN, STOP, LOCK }
 void main() => runApp(MyApp());
@@ -91,20 +92,21 @@ class _ControllerState extends State<Controller> {
   }
 
   void onPressed(String op) {
-    sendGateOp(op);
+    sendHTTPRequest('/gate_op', jsonEncode(<String, String>{'op': op}));
   }
 
   void _enterAdminPage() {}
 
-  Future<http.Response> sendGateOp(String op) {
-    return http.post(
-      Uri.http(ip + ':' + port, '/gate_op'),
-      headers: <String, String>{
-        'Content-Type': 'application/json; charset=UTF-8',
-      },
-      body: jsonEncode(<String, String>{
-        'op': op,
-      }),
-    );
+  Future<http.Response?> sendHTTPRequest(String path, String body) async {
+    try {
+      return await http.post(Uri.http(ip + ':' + port, path),
+          headers: <String, String>{
+            'Content-Type': 'application/json; charset=UTF-8',
+          },
+          body: body);
+    } on SocketException {
+      Fluttertoast.showToast(msg: "Connection Error");
+      return null;
+    }
   }
 }
