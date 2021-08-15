@@ -5,7 +5,6 @@ import 'package:http/http.dart' as http;
 import 'package:fluttertoast/fluttertoast.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
-//enum OP { UP, DOWN, STOP, LOCK }
 void main() => runApp(MyApp());
 
 class MyApp extends StatelessWidget {
@@ -14,6 +13,7 @@ class MyApp extends StatelessWidget {
     return MaterialApp(title: "controller", home: Controller());
   }
 }
+
 class Controller extends StatefulWidget {
   @override
   _ControllerState createState() => _ControllerState();
@@ -22,42 +22,43 @@ class Controller extends StatefulWidget {
 class _ControllerState extends State<Controller> {
   final ip = '218.161.107.174';
   final port = '5000';
-  var storage;
-  var storageData;
+  final _storage = FlutterSecureStorage();
+  var hasKey;
 
   @override
   void initState() {
     super.initState();
-    initKeys();
+    _hasKey();
   }
 
-  void initKeys() async {
-    storage = FlutterSecureStorage();
-    await storage.deleteAll();
-    storageData = await storage.read(key: "key");
+  Future<Null> _hasKey() async {
+    final result = await _storage.containsKey(key: "token") &&
+        await _storage.containsKey(key: "secret");
+    setState(() {
+      hasKey = result;
+    });
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text('Remote Controller'),
-        actions: (storageData == null)
-            ? []
-            : [
-                IconButton(
-                    icon: Icon(Icons.admin_panel_settings),
-                    onPressed: _enterAdminPage)
-              ],
-      ),
+          title: Text('Remote Controller'),
+          actions: (hasKey)
+              ? [
+                  IconButton(
+                      icon: Icon(Icons.admin_panel_settings),
+                      onPressed: _enterAdminPage)
+                ]
+              : []),
       body: Center(
-        child: (storageData == null) ? _buildLogin() : _buildGrid(),
+        child: (hasKey) ? _buildGrid() : _buildLogin(),
       ),
     );
   }
 
-  Widget _buildLogin(){
-    return 
+  Widget? _buildLogin() {
+    return null;
   }
 
   Widget _buildGrid() {
