@@ -17,6 +17,8 @@ class _ControllerState extends State<Controller> {
   final port = '5000';
   final _storage = FlutterSecureStorage();
   var hasKey;
+  var _username;
+  var _otp;
 
   @override
   void initState() {
@@ -50,9 +52,32 @@ class _ControllerState extends State<Controller> {
     );
   }
 
-  Widget? _buildLogin() {
-    return null;
+  Widget _buildLogin() {
+    return Form(
+      child: Column(
+        children: [
+          TextFormField(
+            textInputAction: TextInputAction.next,
+            decoration: const InputDecoration(
+                labelText: "Your username:", filled: true),
+            onChanged: (value) {
+              _username = value;
+            },
+          ),
+          TextFormField(
+            decoration: const InputDecoration(
+                labelText: "OTP from admin:", filled: true),
+            onChanged: (value) {
+              _otp = value;
+            },
+          ),
+          TextButton(onPressed: verify, child: const Text("Verify"))
+        ],
+      ),
+    );
   }
+
+  void verify() {}
 
   Widget _buildGrid() {
     return Expanded(
@@ -80,13 +105,13 @@ class _ControllerState extends State<Controller> {
   Widget _buttonBuilder(String op, IconData icon) {
     return Expanded(
         child: IconButton(
-      onPressed: () => onPressed(op),
+      onPressed: () => gateAction(op),
       icon: Icon(icon),
       iconSize: 120,
     ));
   }
 
-  void onPressed(String op) {
+  void gateAction(String op) {
     sendHTTPRequest('/gate_op', jsonEncode(<String, String>{'op': op}));
   }
 
