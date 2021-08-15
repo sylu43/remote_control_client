@@ -1,9 +1,9 @@
 import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
 import 'package:http/http.dart' as http;
 import 'package:fluttertoast/fluttertoast.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 //enum OP { UP, DOWN, STOP, LOCK }
 void main() => runApp(MyApp());
@@ -11,29 +11,9 @@ void main() => runApp(MyApp());
 class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
-    return Provider<KeyCheck>(
-        create: (context) => KeyCheck(),
-        child: MaterialApp(title: "controller", home: Controller()));
+    return MaterialApp(title: "controller", home: Controller());
   }
 }
-
-class KeyCheck extends StatefulWidget {
-  @override
-  _KeyCheckState createState() => _KeyCheckState();
-  //void dispose() {}
-}
-
-class _KeyCheckState extends State<KeyCheck> {
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: Text('Checking key...'),
-      ),
-    );
-  }
-}
-
 class Controller extends StatefulWidget {
   @override
   _ControllerState createState() => _ControllerState();
@@ -42,21 +22,42 @@ class Controller extends StatefulWidget {
 class _ControllerState extends State<Controller> {
   final ip = '218.161.107.174';
   final port = '5000';
+  var storage;
+  var storageData;
+
+  @override
+  void initState() {
+    super.initState();
+    initKeys();
+  }
+
+  void initKeys() async {
+    storage = FlutterSecureStorage();
+    await storage.deleteAll();
+    storageData = await storage.read(key: "key");
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
         title: Text('Remote Controller'),
-        actions: [
-          IconButton(
-              icon: Icon(Icons.admin_panel_settings),
-              onPressed: _enterAdminPage),
-        ],
+        actions: (storageData == null)
+            ? []
+            : [
+                IconButton(
+                    icon: Icon(Icons.admin_panel_settings),
+                    onPressed: _enterAdminPage)
+              ],
       ),
       body: Center(
-        child: _buildGrid(),
+        child: (storageData == null) ? _buildLogin() : _buildGrid(),
       ),
     );
+  }
+
+  Widget _buildLogin(){
+    return 
   }
 
   Widget _buildGrid() {
