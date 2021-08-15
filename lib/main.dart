@@ -5,14 +5,7 @@ import 'package:http/http.dart' as http;
 import 'package:fluttertoast/fluttertoast.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
-void main() => runApp(MyApp());
-
-class MyApp extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) {
-    return MaterialApp(title: "controller", home: Controller());
-  }
-}
+void main() => runApp(MaterialApp(home: Controller()));
 
 class Controller extends StatefulWidget {
   @override
