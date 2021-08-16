@@ -16,38 +16,49 @@ class _ControllerState extends State<Controller> {
   final ip = '218.161.107.174';
   final port = '5000';
   final _storage = FlutterSecureStorage();
-  var hasKey;
   var _username;
   var _otp;
 
   @override
   void initState() {
     super.initState();
-    _hasKey();
   }
 
-  Future<Null> _hasKey() async {
-    final result = await _storage.containsKey(key: "token") &&
-        await _storage.containsKey(key: "secret");
-    setState(() {
-      hasKey = result;
-    });
+  Future<bool> _hasKey() async {
+    return (await _storage.containsKey(key: "token") &&
+        await _storage.containsKey(key: "secret"));
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-          title: Text('Remote Controller'),
-          actions: (hasKey)
-              ? [
-                  IconButton(
-                      icon: Icon(Icons.admin_panel_settings),
-                      onPressed: _enterAdminPage)
-                ]
-              : []),
+      appBar: AppBar(title: Text('Remote Controller'), actions: [
+        FutureBuilder<bool>(
+          future: _hasKey(),
+          builder: (BuildContext context, AsyncSnapshot snapshot) {
+            if (snapshot.connectionState == ConnectionState.done) {
+              return (snapshot.data)
+                  ? IconButton(
+                      onPressed: _enterAdminPage,
+                      icon: Icon(Icons.admin_panel_settings))
+                  : Icon(Icons.admin_panel_settings);
+            } else {
+              return CircularProgressIndicator();
+            }
+          },
+        )
+      ]),
       body: Center(
-        child: (hasKey) ? _buildGrid() : _buildLogin(),
+        child: FutureBuilder<bool>(
+          future: _hasKey(),
+          builder: (BuildContext context, AsyncSnapshot snapshot) {
+            if (snapshot.connectionState == ConnectionState.done) {
+              return (snapshot.data) ? _buildGrid() : _buildLogin();
+            } else {
+              return CircularProgressIndicator();
+            }
+          },
+        ),
       ),
     );
   }
