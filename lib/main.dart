@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:fluttertoast/fluttertoast.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:jaguar_jwt/jaguar_jwt.dart';
 
 void main() => runApp(MaterialApp(home: Controller()));
 
@@ -18,6 +19,8 @@ class _ControllerState extends State<Controller> {
   final _storage = FlutterSecureStorage();
   var _username;
   var _otp;
+  var _token;
+  var _secret;
 
   @override
   void initState() {
@@ -25,6 +28,7 @@ class _ControllerState extends State<Controller> {
   }
 
   Future<bool> _hasKey() async {
+    //await _storage.deleteAll();
     return (await _storage.containsKey(key: "token") &&
         await _storage.containsKey(key: "secret"));
   }
@@ -88,7 +92,27 @@ class _ControllerState extends State<Controller> {
     );
   }
 
-  void verify() {}
+  void verify() async {
+    final r =
+        await sendHTTPRequest("/checkin", jsonEncode({"name": _username}));
+    try {
+      //decode data with otp
+      final checkinJWT =
+          verifyJwtHS256Signature(jsonDecode(r!.body)['data'], _otp);
+      _token = checkinJWT.toJson()['token'];
+      _secret = checkinJWT.toJson()['secret'];
+
+      //decode token
+      final dataJWT = verifyJwtHS256Signature(_token, _secret);
+      if (_username == dataJWT.toJson()['sub']) {
+        _storage.write(key: "token", value: _token);
+        _storage.write(key: "secret", value: _secret);
+        setState(() {});
+      }
+    } on JwtException {
+      Fluttertoast.showToast(msg: "invalid OTP");
+    }
+  }
 
   Widget _buildGrid() {
     return Expanded(
