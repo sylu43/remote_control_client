@@ -5,6 +5,7 @@ import 'package:http/http.dart' as http;
 import 'package:fluttertoast/fluttertoast.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:jaguar_jwt/jaguar_jwt.dart';
+import 'package:crypto/crypto.dart';
 
 void main() => runApp(MaterialApp(home: Controller()));
 
@@ -22,13 +23,10 @@ class _ControllerState extends State<Controller> {
   var _token;
   var _secret;
 
-  @override
-  void initState() {
-    super.initState();
-  }
-
   Future<bool> _hasKey() async {
     //await _storage.deleteAll();
+    _token = await _storage.read(key: "token");
+    _secret = await _storage.read(key: "secret");
     return (await _storage.containsKey(key: "token") &&
         await _storage.containsKey(key: "secret"));
   }
@@ -153,10 +151,19 @@ class _ControllerState extends State<Controller> {
   void _enterAdminPage() {}
 
   Future<http.Response?> sendHTTPRequest(String path, String body) async {
+    final nonce = DateTime.now().microsecondsSinceEpoch.toString();
+    var hs256 = (_secret != null) ? Hmac(sha256, utf8.encode(_secret)) : null;
+    final signature = (_secret != null)
+        ? hs256!.convert(utf8.encode("$path$nonce$body"))
+        : null; //hex string
+
     try {
       return await http.post(Uri.http(ip + ':' + port, path),
           headers: <String, String>{
             'Content-Type': 'application/json; charset=UTF-8',
+            'nonce': nonce,
+            'token': (_token != null) ? (_token) : '',
+            'signature': (_secret != null) ? "$signature" : ''
           },
           body: body);
     } on SocketException {

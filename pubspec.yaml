@@ -30,6 +30,7 @@ dependencies:
   fluttertoast: ^8.0.8
   flutter_secure_storage: ^4.2.1
   jaguar_jwt: ^3.0.0
+  crypto: ^3.0.1
 
 dev_dependencies:
   flutter_test:
