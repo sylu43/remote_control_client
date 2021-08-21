@@ -6,6 +6,7 @@ import 'package:fluttertoast/fluttertoast.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:jaguar_jwt/jaguar_jwt.dart';
 import 'package:crypto/crypto.dart';
+import 'package:convert/convert.dart';
 
 void main() => runApp(MaterialApp(home: Controller()));
 
@@ -152,11 +153,11 @@ class _ControllerState extends State<Controller> {
 
   Future<http.Response?> sendHTTPRequest(String path, String body) async {
     final nonce = DateTime.now().microsecondsSinceEpoch.toString();
-    var hs256 = (_secret != null) ? Hmac(sha256, utf8.encode(_secret)) : null;
+    var hs256 = (_secret != null) ? Hmac(sha256, hex.decode(_secret)) : null;
     final signature = (_secret != null)
         ? hs256!.convert(utf8.encode("$path$nonce$body"))
         : null; //hex string
-
+    Fluttertoast.showToast(msg: body);
     try {
       return await http.post(Uri.http(ip + ':' + port, path),
           headers: <String, String>{
