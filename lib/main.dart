@@ -7,6 +7,7 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:jaguar_jwt/jaguar_jwt.dart';
 import 'package:crypto/crypto.dart';
 import 'package:convert/convert.dart';
+import 'package:intl/intl.dart';
 
 void main() => runApp(MaterialApp(home: Controller()));
 
@@ -14,6 +15,8 @@ class Controller extends StatefulWidget {
   @override
   _ControllerState createState() => _ControllerState();
 }
+
+enum METHOD { GET, POST }
 
 class _ControllerState extends State<Controller> {
   final ip = '218.161.107.174';
@@ -92,8 +95,8 @@ class _ControllerState extends State<Controller> {
   }
 
   void verify() async {
-    final r =
-        await sendHTTPRequest("/checkin", jsonEncode({"name": _username}));
+    final r = await sendHTTPRequest(
+        "/checkin", jsonEncode({"name": _username}), METHOD.POST);
     try {
       //decode data with otp
       final checkinJWT =
@@ -146,30 +149,100 @@ class _ControllerState extends State<Controller> {
   }
 
   void gateAction(String op) {
-    sendHTTPRequest('/gate_op', jsonEncode(<String, String>{'op': op}));
+    sendHTTPRequest(
+        '/gate_op', jsonEncode(<String, String>{'op': op}), METHOD.POST);
   }
 
-  void _enterAdminPage() {}
+  void _enterAdminPage() async {
+    final response = await sendHTTPRequest(
+        "/list", jsonEncode(<String, String>{}), METHOD.GET);
+    if (response != null) {
+      if (response.statusCode == 200) {
+        Navigator.push(
+            context,
+            MaterialPageRoute(
+                builder: (context) => AdminPage(
+                    token: _token,
+                    secret: _secret,
+                    data: response,
+                    sendHTTPRequest: sendHTTPRequest)));
+      } else {
+        Fluttertoast.showToast(msg: "You shall not pass");
+      }
+    }
+  }
 
-  Future<http.Response?> sendHTTPRequest(String path, String body) async {
+  Future<http.Response?> sendHTTPRequest(
+      String path, String body, METHOD method) async {
     final nonce = DateTime.now().microsecondsSinceEpoch.toString();
     var hs256 = (_secret != null) ? Hmac(sha256, hex.decode(_secret)) : null;
     final signature = (_secret != null)
         ? hs256!.convert(utf8.encode("$path$nonce$body"))
         : null; //hex string
-    Fluttertoast.showToast(msg: body);
+    final header = <String, String>{
+      'Content-Type': 'application/json; charset=UTF-8',
+      'nonce': nonce,
+      'token': (_token != null) ? (_token) : '',
+      'signature': (_secret != null) ? "$signature" : ''
+    };
     try {
-      return await http.post(Uri.http(ip + ':' + port, path),
-          headers: <String, String>{
-            'Content-Type': 'application/json; charset=UTF-8',
-            'nonce': nonce,
-            'token': (_token != null) ? (_token) : '',
-            'signature': (_secret != null) ? "$signature" : ''
-          },
-          body: body);
+      if (method == METHOD.POST) {
+        return await http.post(Uri.http(ip + ':' + port, path),
+            headers: header, body: body);
+      } else if (method == METHOD.GET) {
+        return await http.get(Uri.http(ip + ':' + port, path), headers: header);
+      }
     } on SocketException {
       Fluttertoast.showToast(msg: "Connection Error");
       return null;
     }
+  }
+}
+
+class AdminPage extends StatefulWidget {
+  final token;
+  final secret;
+  final data;
+  final Function sendHTTPRequest;
+  const AdminPage(
+      {Key? key,
+      required this.token,
+      required this.secret,
+      required this.data,
+      required this.sendHTTPRequest})
+      : super(key: key);
+  @override
+  _AdminPageState createState() => _AdminPageState();
+}
+
+class _AdminPageState extends State<AdminPage> {
+  List<Widget> userList = [];
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: const Text("Admin Page")),
+      body: _buildUserList(),
+    );
+  }
+
+  Widget _buildUserList() {
+    final body = json.decode(widget.data.body);
+    for (var user in body['users']) {
+      userList.add(Card(
+          child: ListTile(
+              title: Text(user['name']),
+              subtitle: Text(
+                user['zone'] +
+                    "\n" +
+                    DateFormat.yMd().add_Hm().format(
+                        DateTime.fromMillisecondsSinceEpoch(
+                                (user['expireDate'].round() * 1000),
+                                isUtc: true)
+                            .toLocal()),
+              ))));
+    }
+
+    return ListView(children: userList);
   }
 }
