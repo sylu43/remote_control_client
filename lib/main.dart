@@ -8,6 +8,7 @@ import 'package:jaguar_jwt/jaguar_jwt.dart';
 import 'package:crypto/crypto.dart';
 import 'package:convert/convert.dart';
 import 'package:intl/intl.dart';
+import 'package:datetime_picker_formfield/datetime_picker_formfield.dart';
 
 void main() => runApp(MaterialApp(home: Controller()));
 
@@ -109,6 +110,7 @@ class _ControllerState extends State<Controller> {
       if (_username == dataJWT.toJson()['sub']) {
         _storage.write(key: "token", value: _token);
         _storage.write(key: "secret", value: _secret);
+        _storage.write(key: "username", value: _username);
         setState(() {});
       }
     } on JwtException {
@@ -154,6 +156,7 @@ class _ControllerState extends State<Controller> {
   }
 
   void _enterAdminPage() async {
+    _username = await _storage.read(key: "username");
     final response = await sendHTTPRequest(
         "/list", jsonEncode(<String, String>{}), METHOD.GET);
     if (response != null) {
@@ -162,6 +165,7 @@ class _ControllerState extends State<Controller> {
             context,
             MaterialPageRoute(
                 builder: (context) => AdminPage(
+                    username: _username,
                     token: _token,
                     secret: _secret,
                     data: response,
@@ -200,12 +204,14 @@ class _ControllerState extends State<Controller> {
 }
 
 class AdminPage extends StatefulWidget {
+  final username;
   final token;
   final secret;
   final data;
   final Function sendHTTPRequest;
   const AdminPage(
       {Key? key,
+      required this.username,
       required this.token,
       required this.secret,
       required this.data,
@@ -221,28 +227,119 @@ class _AdminPageState extends State<AdminPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text("Admin Page")),
+      appBar: AppBar(
+        title: const Text("Admin Page"),
+        actions: [IconButton(onPressed: addUser, icon: Icon(Icons.add))],
+      ),
       body: _buildUserList(),
     );
+  }
+
+  void addUser() {
+    Navigator.push(
+        context,
+        MaterialPageRoute(
+            builder: (context) => AddUserPage(
+                  sendHTTPRequest: widget.sendHTTPRequest,
+                )));
   }
 
   Widget _buildUserList() {
     final body = json.decode(widget.data.body);
     for (var user in body['users']) {
       userList.add(Card(
-          child: ListTile(
-              title: Text(user['name']),
-              subtitle: Text(
-                user['zone'] +
-                    "\n" +
-                    DateFormat.yMd().add_Hm().format(
-                        DateTime.fromMillisecondsSinceEpoch(
-                                (user['expireDate'].round() * 1000),
-                                isUtc: true)
-                            .toLocal()),
-              ))));
+        child: ListTile(
+          title: Text(user['name']),
+          subtitle: Text(
+            user['zone'] +
+                "\n" +
+                DateFormat.yMd().add_Hm().format(
+                    DateTime.fromMillisecondsSinceEpoch(
+                            (user['expireDate'].round() * 1000),
+                            isUtc: true)
+                        .toLocal()),
+          ),
+          trailing: (user['name'] == widget.username)
+              ? null
+              : IconButton(
+                  icon: Icon(Icons.delete),
+                  onPressed: () => deleteUser(user['name'])),
+        ),
+      ));
     }
-
     return ListView(children: userList);
+  }
+
+  void deleteUser(String name) async {
+    await widget.sendHTTPRequest(
+        "/delete", jsonEncode({"name": name}), METHOD.POST);
+  }
+}
+
+class AddUserPage extends StatefulWidget {
+  final Function sendHTTPRequest;
+  const AddUserPage({Key? key, required this.sendHTTPRequest})
+      : super(key: key);
+
+  @override
+  _AddUserPageState createState() => _AddUserPageState();
+}
+
+class _AddUserPageState extends State<AddUserPage> {
+  var name;
+  var zone;
+  var expDate;
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+        appBar: AppBar(title: Text("Add User")),
+        body: Form(
+          child: Column(
+            children: [
+              TextFormField(
+                textInputAction: TextInputAction.next,
+                decoration: const InputDecoration(
+                    labelText: "Username to add:", filled: true),
+                onChanged: (value) {
+                  name = value;
+                },
+              ),
+              TextFormField(
+                decoration:
+                    const InputDecoration(labelText: "Zone:", filled: true),
+                onChanged: (value) {
+                  zone = value;
+                },
+              ),
+              DateTimeField(
+                  format: DateFormat("yyyy/MM/dd"),
+                  decoration: const InputDecoration(
+                      labelText: "Expire Date", filled: true),
+                  onShowPicker: (context, currentValue) {
+                    return showDatePicker(
+                        context: context,
+                        firstDate: DateTime.now(),
+                        initialDate: currentValue ?? DateTime.now(),
+                        lastDate: DateTime(2100));
+                  },
+                  onChanged: (value) {
+                    expDate = value!.microsecondsSinceEpoch / 1000000;
+                  }),
+              TextButton(onPressed: register, child: const Text("Register"))
+            ],
+          ),
+        ));
+  }
+
+  void register() async {
+    widget.sendHTTPRequest(
+        "/register",
+        jsonEncode({
+          "name": name,
+          "zone": zone,
+          "time": expDate + Duration.secondsPerDay - 1
+        }),
+        METHOD.POST);
   }
 }
