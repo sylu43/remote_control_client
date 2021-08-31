@@ -223,9 +223,12 @@ class AdminPage extends StatefulWidget {
 
 class _AdminPageState extends State<AdminPage> {
   List<Widget> userList = [];
-
+  var data;
   @override
   Widget build(BuildContext context) {
+    if (data == null) {
+      data = widget.data;
+    }
     return Scaffold(
       appBar: AppBar(
         title: const Text("Admin Page"),
@@ -235,17 +238,24 @@ class _AdminPageState extends State<AdminPage> {
     );
   }
 
-  void addUser() {
+  void addUser() async {
     Navigator.push(
         context,
         MaterialPageRoute(
             builder: (context) => AddUserPage(
-                  sendHTTPRequest: widget.sendHTTPRequest,
-                )));
+                sendHTTPRequest: widget.sendHTTPRequest,
+                refreshList: refreshList)));
+  }
+
+  void refreshList() async {
+    data = await widget.sendHTTPRequest(
+        "/list", jsonEncode(<String, String>{}), METHOD.GET);
+    userList = [];
+    setState(() {});
   }
 
   Widget _buildUserList() {
-    final body = json.decode(widget.data.body);
+    final body = json.decode(data.body);
     for (var user in body['users']) {
       userList.add(Card(
         child: ListTile(
@@ -273,12 +283,15 @@ class _AdminPageState extends State<AdminPage> {
   void deleteUser(String name) async {
     await widget.sendHTTPRequest(
         "/delete", jsonEncode({"name": name}), METHOD.POST);
+    refreshList();
   }
 }
 
 class AddUserPage extends StatefulWidget {
   final Function sendHTTPRequest;
-  const AddUserPage({Key? key, required this.sendHTTPRequest})
+  final Function refreshList;
+  const AddUserPage(
+      {Key? key, required this.sendHTTPRequest, required this.refreshList})
       : super(key: key);
 
   @override
@@ -333,7 +346,7 @@ class _AddUserPageState extends State<AddUserPage> {
   }
 
   void register() async {
-    widget.sendHTTPRequest(
+    await widget.sendHTTPRequest(
         "/register",
         jsonEncode({
           "name": name,
@@ -341,5 +354,7 @@ class _AddUserPageState extends State<AddUserPage> {
           "time": expDate + Duration.secondsPerDay - 1
         }),
         METHOD.POST);
+    widget.refreshList();
+    Navigator.pop(context);
   }
 }
