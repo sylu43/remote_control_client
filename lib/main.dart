@@ -4,11 +4,10 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:fluttertoast/fluttertoast.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
-import 'package:jaguar_jwt/jaguar_jwt.dart';
-import 'package:crypto/crypto.dart';
 import 'package:convert/convert.dart';
 import 'package:intl/intl.dart';
 import 'package:datetime_picker_formfield/datetime_picker_formfield.dart';
+import 'package:encrypt/encrypt.dart' as crypt;
 
 void main() => runApp(MaterialApp(home: Controller()));
 
@@ -24,16 +23,14 @@ class _ControllerState extends State<Controller> {
   final port = '5000';
   final _storage = FlutterSecureStorage();
   var _username;
-  var _otp;
   var _token;
-  var _secret;
 
   Future<bool> _hasKey() async {
     //await _storage.deleteAll();
     _token = await _storage.read(key: "token");
-    _secret = await _storage.read(key: "secret");
+    _username = await _storage.read(key: "username");
     return (await _storage.containsKey(key: "token") &&
-        await _storage.containsKey(key: "secret"));
+        await _storage.containsKey(key: "username"));
   }
 
   @override
@@ -82,40 +79,28 @@ class _ControllerState extends State<Controller> {
               _username = value;
             },
           ),
-          TextFormField(
-            decoration: const InputDecoration(
-                labelText: "OTP from admin:", filled: true),
-            onChanged: (value) {
-              _otp = value;
-            },
-          ),
-          TextButton(onPressed: verify, child: const Text("Verify"))
+          TextButton(onPressed: apply, child: const Text("Apply"))
         ],
       ),
     );
   }
 
-  void verify() async {
+  void apply() async {
     final r = await sendHTTPRequest(
-        "/checkin", jsonEncode({"name": _username}), METHOD.POST);
-    try {
-      //decode data with otp
-      final checkinJWT =
-          verifyJwtHS256Signature(jsonDecode(r!.body)['data'], _otp);
-      _token = checkinJWT.toJson()['token'];
-      _secret = checkinJWT.toJson()['secret'];
+        "/register",
+        jsonEncode({
+          "name": _username,
+          "zone": "test",
+        }),
+        METHOD.POST);
+    //decode data with otp
+    _token = json.decode(r!.body)['token'];
 
-      //decode token
-      final dataJWT = verifyJwtHS256Signature(_token, _secret);
-      if (_username == dataJWT.toJson()['sub']) {
-        _storage.write(key: "token", value: _token);
-        _storage.write(key: "secret", value: _secret);
-        _storage.write(key: "username", value: _username);
-        setState(() {});
-      }
-    } on JwtException {
-      Fluttertoast.showToast(msg: "invalid OTP");
-    }
+    //decode token
+    _storage.write(key: "username", value: _username);
+    _storage.write(key: "token", value: _token);
+    Fluttertoast.showToast(msg: "$_token");
+    setState(() {});
   }
 
   Widget _buildGrid() {
@@ -151,14 +136,13 @@ class _ControllerState extends State<Controller> {
   }
 
   void gateAction(String op) {
-    sendHTTPRequest(
-        '/gate_op', jsonEncode(<String, String>{'op': op}), METHOD.POST);
+    sendHTTPRequest('/gate_op',
+        jsonEncode(<String, String>{'name': _username, 'op': op}), METHOD.POST);
   }
 
   void _enterAdminPage() async {
-    _username = await _storage.read(key: "username");
     final response = await sendHTTPRequest(
-        "/list", jsonEncode(<String, String>{}), METHOD.GET);
+        "/list", jsonEncode(<String, String>{'name': _username}), METHOD.POST);
     if (response != null) {
       if (response.statusCode == 200) {
         Navigator.push(
@@ -167,7 +151,6 @@ class _ControllerState extends State<Controller> {
                 builder: (context) => AdminPage(
                     username: _username,
                     token: _token,
-                    secret: _secret,
                     data: response,
                     sendHTTPRequest: sendHTTPRequest)));
       } else {
@@ -178,16 +161,19 @@ class _ControllerState extends State<Controller> {
 
   Future<http.Response?> sendHTTPRequest(
       String path, String body, METHOD method) async {
+    final _secret = 'secret';
     final nonce = DateTime.now().microsecondsSinceEpoch.toString();
+    /*
     var hs256 = (_secret != null) ? Hmac(sha256, hex.decode(_secret)) : null;
     final signature = (_secret != null)
         ? hs256!.convert(utf8.encode("$path$nonce$body"))
         : null; //hex string
+        */
     final header = <String, String>{
       'Content-Type': 'application/json; charset=UTF-8',
       'nonce': nonce,
       'token': (_token != null) ? (_token) : '',
-      'signature': (_secret != null) ? "$signature" : ''
+      //'signature': (_secret != null) ? "$signature" : ''
     };
     try {
       if (method == METHOD.POST) {
@@ -206,14 +192,12 @@ class _ControllerState extends State<Controller> {
 class AdminPage extends StatefulWidget {
   final username;
   final token;
-  final secret;
   final data;
   final Function sendHTTPRequest;
   const AdminPage(
       {Key? key,
       required this.username,
       required this.token,
-      required this.secret,
       required this.data,
       required this.sendHTTPRequest})
       : super(key: key);
@@ -230,26 +214,28 @@ class _AdminPageState extends State<AdminPage> {
       data = widget.data;
     }
     return Scaffold(
-      appBar: AppBar(
-        title: const Text("Admin Page"),
-        actions: [IconButton(onPressed: addUser, icon: Icon(Icons.add))],
-      ),
+      appBar: AppBar(title: const Text("Admin Page")),
       body: _buildUserList(),
     );
   }
 
-  void addUser() async {
+  void editUser(
+      String name, String zone, int activated, double expireDate) async {
     Navigator.push(
         context,
         MaterialPageRoute(
-            builder: (context) => AddUserPage(
+            builder: (context) => EditUserPage(
+                name: name,
+                zone: zone,
+                activated: activated,
+                expDate: expireDate,
                 sendHTTPRequest: widget.sendHTTPRequest,
                 refreshList: refreshList)));
   }
 
   void refreshList() async {
-    data = await widget.sendHTTPRequest(
-        "/list", jsonEncode(<String, String>{}), METHOD.GET);
+    data = await widget.sendHTTPRequest("/list",
+        jsonEncode(<String, String>{"name": widget.username}), METHOD.POST);
     userList = [];
     setState(() {});
   }
@@ -257,25 +243,28 @@ class _AdminPageState extends State<AdminPage> {
   Widget _buildUserList() {
     final body = json.decode(data.body);
     for (var user in body['users']) {
-      userList.add(Card(
-        child: ListTile(
-          title: Text(user['name']),
-          subtitle: Text(
-            user['zone'] +
-                "\n" +
-                DateFormat.yMd().add_Hm().format(
-                    DateTime.fromMillisecondsSinceEpoch(
-                            (user['expireDate'].round() * 1000),
-                            isUtc: true)
-                        .toLocal()),
-          ),
-          trailing: (user['name'] == widget.username)
-              ? null
-              : IconButton(
-                  icon: Icon(Icons.delete),
-                  onPressed: () => deleteUser(user['name'])),
-        ),
-      ));
+      userList.add(GestureDetector(
+          onTap: () => editUser(user['name'], user['zone'], user['activated'],
+              user['expireDate']),
+          child: Card(
+            child: ListTile(
+              title: Text(user['name']),
+              subtitle: Text(
+                user['zone'] +
+                    "\n" +
+                    DateFormat.yMd().add_Hm().format(
+                        DateTime.fromMicrosecondsSinceEpoch(
+                                (user['expireDate'].round() * 1000000),
+                                isUtc: true)
+                            .toLocal()),
+              ),
+              trailing: (user['name'] == widget.username)
+                  ? null
+                  : IconButton(
+                      icon: Icon(Icons.delete),
+                      onPressed: () => deleteUser(user['name'])),
+            ),
+          )));
     }
     return ListView(children: userList);
   }
@@ -287,36 +276,52 @@ class _AdminPageState extends State<AdminPage> {
   }
 }
 
-class AddUserPage extends StatefulWidget {
+class EditUserPage extends StatefulWidget {
+  final name;
+  final zone;
+  final activated;
+  final expDate;
   final Function sendHTTPRequest;
   final Function refreshList;
-  const AddUserPage(
-      {Key? key, required this.sendHTTPRequest, required this.refreshList})
+  const EditUserPage(
+      {Key? key,
+      required this.name,
+      required this.zone,
+      required this.activated,
+      required this.expDate,
+      required this.sendHTTPRequest,
+      required this.refreshList})
       : super(key: key);
 
   @override
-  _AddUserPageState createState() => _AddUserPageState();
+  _EditUserPageState createState() => _EditUserPageState();
 }
 
-class _AddUserPageState extends State<AddUserPage> {
+class _EditUserPageState extends State<EditUserPage> {
   var name;
   var zone;
+  var activated;
   var expDate;
 
   @override
   Widget build(BuildContext context) {
+    name = widget.name;
+    zone = widget.zone;
+    activated = widget.activated;
+    expDate = widget.expDate;
     return Scaffold(
-        appBar: AppBar(title: Text("Add User")),
+        appBar: AppBar(title: Text("Edit User")),
         body: Form(
           child: Column(
             children: [
               TextFormField(
                 textInputAction: TextInputAction.next,
-                decoration: const InputDecoration(
-                    labelText: "Username to add:", filled: true),
+                decoration:
+                    const InputDecoration(labelText: "Username:", filled: true),
                 onChanged: (value) {
                   name = value;
                 },
+                initialValue: widget.name,
               ),
               TextFormField(
                 decoration:
@@ -324,37 +329,38 @@ class _AddUserPageState extends State<AddUserPage> {
                 onChanged: (value) {
                   zone = value;
                 },
+                initialValue: widget.zone,
               ),
               DateTimeField(
-                  format: DateFormat("yyyy/MM/dd"),
-                  decoration: const InputDecoration(
-                      labelText: "Expire Date", filled: true),
-                  onShowPicker: (context, currentValue) {
-                    return showDatePicker(
-                        context: context,
-                        firstDate: DateTime.now(),
-                        initialDate: currentValue ?? DateTime.now(),
-                        lastDate: DateTime(2100));
-                  },
-                  onChanged: (value) {
-                    expDate = value!.microsecondsSinceEpoch / 1000000;
-                  }),
-              TextButton(onPressed: register, child: const Text("Register"))
+                format: DateFormat("yyyy/MM/dd"),
+                decoration: const InputDecoration(
+                    labelText: "Expire Date:", filled: true),
+                onShowPicker: (context, currentValue) {
+                  return showDatePicker(
+                      context: context,
+                      firstDate: DateTime(2022),
+                      initialDate: currentValue ?? DateTime.now(),
+                      lastDate: DateTime(2100));
+                },
+                onChanged: (value) {
+                  expDate = value!.microsecondsSinceEpoch / 1000000;
+                },
+                initialValue: DateTime.fromMicrosecondsSinceEpoch(
+                    widget.expDate.round() * 1000000),
+              ),
+              TextButton(onPressed: save, child: const Text("Save changes"))
             ],
           ),
         ));
   }
 
-  void register() async {
+  void save() async {
     await widget.sendHTTPRequest(
-        "/register",
-        jsonEncode({
-          "name": name,
-          "zone": zone,
-          "time": expDate + Duration.secondsPerDay - 1
-        }),
+        "/update",
+        jsonEncode(
+            {"name": name, "zone": zone, "activated": 1, "expDate": expDate}),
         METHOD.POST);
-    widget.refreshList();
+    super.widget.refreshList();
     Navigator.pop(context);
   }
 }
