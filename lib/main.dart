@@ -98,40 +98,24 @@ class _ControllerState extends State<Controller> {
     //decode token
     await _storage.write(key: "username", value: _username);
     await _storage.write(key: "token", value: _token);
-    Fluttertoast.showToast(msg: "$_token");
     setState(() {});
   }
 
   Widget _buildGrid() {
-    return Expanded(
-        child: Row(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-      Expanded(
-          child: IntrinsicWidth(
-              child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          _buttonBuilder('up', Icons.arrow_upward),
-          _buttonBuilder('down', Icons.arrow_downward)
-        ],
-      ))),
-      Expanded(
-          child: IntrinsicWidth(
-              child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-            _buttonBuilder('stop', Icons.stop),
-            _buttonBuilder('lock', Icons.lock)
-          ])))
-    ]));
+    return GridView(
+        gridDelegate: SliverGridDelegateWithMaxCrossAxisExtent(
+            maxCrossAxisExtent: 240
+        ),
+        children: [_buttonBuilder('up', Icons.arrow_upward),_buttonBuilder('stop', Icons.stop),_buttonBuilder('down', Icons.arrow_downward),_buttonBuilder('lock', Icons.lock)],
+    );
   }
 
   Widget _buttonBuilder(String op, IconData icon) {
-    return Expanded(
-        child: IconButton(
+    return IconButton(
       onPressed: () => gateAction(op),
       icon: Icon(icon),
       iconSize: 120,
-    ));
+    );
   }
 
   void gateAction(String op) {
