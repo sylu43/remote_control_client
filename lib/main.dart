@@ -241,6 +241,7 @@ class _AdminPageState extends State<AdminPage> {
   }
 
   Widget _buildUserList() {
+    setState(() {});
     final body = json.decode(data.body);
     for (var user in body['users']) {
       userList.add(GestureDetector(
