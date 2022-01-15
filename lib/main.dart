@@ -172,7 +172,6 @@ class _ControllerState extends State<Controller> {
     final header = <String, String>{
       'Content-Type': 'application/json; charset=UTF-8',
       'nonce': nonce,
-      'token': (_token != null) ? (_token) : '',
       //'signature': (_secret != null) ? "$signature" : ''
     };
     try {
@@ -219,18 +218,19 @@ class _AdminPageState extends State<AdminPage> {
     );
   }
 
-  void editUser(
-      String name, String zone, int activated, double expireDate) async {
+  void editUser(String name, String zone, int activated, double expDate) async {
     Navigator.push(
         context,
         MaterialPageRoute(
             builder: (context) => EditUserPage(
+                username: widget.username,
                 name: name,
                 zone: zone,
                 activated: activated,
-                expDate: expireDate,
+                expDate: expDate,
                 sendHTTPRequest: widget.sendHTTPRequest,
                 refreshList: refreshList)));
+    setState(() {});
   }
 
   void refreshList() async {
@@ -244,8 +244,8 @@ class _AdminPageState extends State<AdminPage> {
     final body = json.decode(data.body);
     for (var user in body['users']) {
       userList.add(GestureDetector(
-          onTap: () => editUser(user['name'], user['zone'], user['activated'],
-              user['expireDate']),
+          onTap: () => editUser(
+              user['name'], user['zone'], user['activated'], user['expDate']),
           child: Card(
             child: ListTile(
               title: Text(user['name']),
@@ -254,15 +254,15 @@ class _AdminPageState extends State<AdminPage> {
                     "\n" +
                     DateFormat.yMd().add_Hm().format(
                         DateTime.fromMicrosecondsSinceEpoch(
-                                (user['expireDate'].round() * 1000000),
+                                (user['expDate'].round() * 1000000),
                                 isUtc: true)
                             .toLocal()),
               ),
-              trailing: (user['name'] == widget.username)
-                  ? null
-                  : IconButton(
-                      icon: Icon(Icons.delete),
-                      onPressed: () => deleteUser(user['name'])),
+              trailing: Icon((user['activated'] == -1)
+                  ? Icons.priority_high
+                  : (user['activated'] == 0)
+                      ? Icons.close
+                      : Icons.done),
             ),
           )));
     }
@@ -270,13 +270,14 @@ class _AdminPageState extends State<AdminPage> {
   }
 
   void deleteUser(String name) async {
-    await widget.sendHTTPRequest(
-        "/delete", jsonEncode({"name": name}), METHOD.POST);
+    await widget.sendHTTPRequest("/delete",
+        jsonEncode({"name": widget.username, "guest": name}), METHOD.POST);
     refreshList();
   }
 }
 
 class EditUserPage extends StatefulWidget {
+  final username;
   final name;
   final zone;
   final activated;
@@ -285,6 +286,7 @@ class EditUserPage extends StatefulWidget {
   final Function refreshList;
   const EditUserPage(
       {Key? key,
+      required this.username,
       required this.name,
       required this.zone,
       required this.activated,
@@ -298,19 +300,29 @@ class EditUserPage extends StatefulWidget {
 }
 
 class _EditUserPageState extends State<EditUserPage> {
-  var name;
   var zone;
   var activated;
   var expDate;
 
   @override
   Widget build(BuildContext context) {
-    name = widget.name;
-    zone = widget.zone;
-    activated = widget.activated;
-    expDate = widget.expDate;
+    zone = (zone == null) ? widget.zone : zone;
+    activated = (activated == null) ? widget.activated : activated;
+    expDate = (expDate == null) ? widget.expDate : expDate;
     return Scaffold(
-        appBar: AppBar(title: Text("Edit User")),
+        appBar: AppBar(
+          title: Text("Edit User"),
+          actions: [
+            Switch(
+                value: (activated == 1) ? true : false,
+                activeColor: Colors.red,
+                onChanged: (value) {
+                  setState(() {
+                    activated = (value == true) ? 1 : 0;
+                  });
+                })
+          ],
+        ),
         body: Form(
           child: Column(
             children: [
@@ -318,9 +330,7 @@ class _EditUserPageState extends State<EditUserPage> {
                 textInputAction: TextInputAction.next,
                 decoration:
                     const InputDecoration(labelText: "Username:", filled: true),
-                onChanged: (value) {
-                  name = value;
-                },
+                enabled: false,
                 initialValue: widget.name,
               ),
               TextFormField(
@@ -338,15 +348,24 @@ class _EditUserPageState extends State<EditUserPage> {
                 onShowPicker: (context, currentValue) {
                   return showDatePicker(
                       context: context,
-                      firstDate: DateTime(2022),
+                      firstDate: DateTime.now(),
                       initialDate: currentValue ?? DateTime.now(),
                       lastDate: DateTime(2100));
                 },
+                resetIcon: null,
                 onChanged: (value) {
-                  expDate = value!.microsecondsSinceEpoch / 1000000;
+                  if (value != null) {
+                    if (value.microsecondsSinceEpoch >
+                        DateTime.now().microsecondsSinceEpoch) {
+                      expDate = value.microsecondsSinceEpoch / 1000000;
+                    }
+                  }
                 },
-                initialValue: DateTime.fromMicrosecondsSinceEpoch(
-                    widget.expDate.round() * 1000000),
+                initialValue: (DateTime.now().microsecondsSinceEpoch >
+                        widget.expDate.round() * 1000000)
+                    ? DateTime.now()
+                    : DateTime.fromMicrosecondsSinceEpoch(
+                        widget.expDate.round() * 1000000),
               ),
               TextButton(onPressed: save, child: const Text("Save changes"))
             ],
@@ -357,8 +376,15 @@ class _EditUserPageState extends State<EditUserPage> {
   void save() async {
     await widget.sendHTTPRequest(
         "/update",
-        jsonEncode(
-            {"name": name, "zone": zone, "activated": 1, "expDate": expDate}),
+        jsonEncode({
+          "name": widget.username,
+          "guest": {
+            "name": widget.name,
+            "zone": zone,
+            "activated": activated,
+            "expDate": expDate
+          }
+        }),
         METHOD.POST);
     super.widget.refreshList();
     Navigator.pop(context);
