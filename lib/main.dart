@@ -92,13 +92,21 @@ class _ControllerState extends State<Controller> {
           "zone": "test",
         }),
         METHOD.POST);
-    //decode data with otp
-    _token = json.decode(r!.body)['token'];
 
-    //decode token
-    await _storage.write(key: "username", value: _username);
-    await _storage.write(key: "token", value: _token);
-    setState(() {});
+    if(r!.statusCode == 409){
+      Fluttertoast.showToast(msg: "註冊過了!");
+    }else if(r.statusCode == 500){
+      Fluttertoast.showToast(msg: "內部錯誤");
+    }else if(r.statusCode == 201){
+      //decode data with secret
+      _token = json.decode(r.body)['token'];
+
+      //decode token
+      await _storage.write(key: "username", value: _username);
+      await _storage.write(key: "token", value: _token);
+      setState(() {});
+      Fluttertoast.showToast(msg: "註冊成功!");
+    }
   }
 
   Widget _buildGrid() {
@@ -118,9 +126,16 @@ class _ControllerState extends State<Controller> {
     );
   }
 
-  void gateAction(String op) {
-    sendHTTPRequest('/gate_op',
+  void gateAction (String op)async {
+    var r= await sendHTTPRequest('/gate_op',
         jsonEncode(<String, String>{'name': _username, 'op': op}), METHOD.POST);
+    if(r!.statusCode == 403){
+      Fluttertoast.showToast(msg: "不給你用!");
+    }else if(r.statusCode == 400){
+      Fluttertoast.showToast(msg: "??????????");
+    }else if(r.statusCode == 200){
+      Fluttertoast.showToast(msg: "OK!");
+    }
   }
 
   void _enterAdminPage() async {
@@ -152,9 +167,6 @@ class _ControllerState extends State<Controller> {
       List<int> sigBytes = utf8.encode("$path$nonce$body");
       var sha = new Hmac(sha256, secretBytes);
       signature = sha.convert(sigBytes).toString();
-      Fluttertoast.showToast(msg: "token?");
-    } else {
-      Fluttertoast.showToast(msg: "no token");
     }
     final header = <String, String>{
       'Content-Type': 'application/json; charset=UTF-8',
@@ -169,7 +181,7 @@ class _ControllerState extends State<Controller> {
         return await http.get(Uri.http(ip + ':' + port, path), headers: header);
       }
     } on SocketException {
-      Fluttertoast.showToast(msg: "Connection Error");
+      Fluttertoast.showToast(msg: "連線錯誤");
       return null;
     }
   }
@@ -245,6 +257,7 @@ class _AdminPageState extends State<AdminPage> {
                                 (user['expDate'].round() * 1000000),
                                 isUtc: true)
                             .toLocal()),
+                style: TextStyle(color: (user['activated'] != 1 || user['expDate'].round() * 1000000 > DateTime.now().microsecondsSinceEpoch ) ? Colors.black : Colors.red),
               ),
               trailing: Icon((user['activated'] == -1)
                   ? Icons.priority_high
