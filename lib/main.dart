@@ -249,21 +249,24 @@ class _AdminPageState extends State<AdminPage> {
           child: Card(
             child: ListTile(
               title: Text(user['name']),
-              subtitle: Text(
-                user['zone'] +
-                    "\n" +
+              subtitle: Text(user['zone']),
+              /*subtitle: Text(
                     DateFormat.yMd().add_Hm().format(
                         DateTime.fromMicrosecondsSinceEpoch(
                                 (user['expDate'].round() * 1000000),
                                 isUtc: true)
                             .toLocal()),
                 style: TextStyle(color: (user['activated'] != 1 || user['expDate'].round() * 1000000 > DateTime.now().microsecondsSinceEpoch ) ? Colors.black : Colors.red),
-              ),
+              ),*/
               trailing: Icon((user['activated'] == -1)
                   ? Icons.priority_high
                   : (user['activated'] == 0)
                       ? Icons.close
-                      : Icons.done),
+                      : (user['expDate'] * 1000000 < DateTime.now().microsecondsSinceEpoch)
+                          ? Icons.date_range
+                          : Icons.done,
+              color: (user['activated'] == 1 && user['expDate'] * 1000000 > DateTime.now().microsecondsSinceEpoch) ? Colors.green : Colors.red,),
+
             ),
           )));
     }
