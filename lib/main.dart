@@ -1,13 +1,12 @@
 import 'dart:convert';
 import 'dart:io';
+import 'package:crypto/crypto.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:fluttertoast/fluttertoast.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
-import 'package:convert/convert.dart';
 import 'package:intl/intl.dart';
 import 'package:datetime_picker_formfield/datetime_picker_formfield.dart';
-import 'package:encrypt/encrypt.dart' as crypt;
 
 void main() => runApp(MaterialApp(home: Controller()));
 
@@ -76,7 +75,7 @@ class _ControllerState extends State<Controller> {
             decoration: const InputDecoration(
                 labelText: "Your username:", filled: true),
             onChanged: (value) {
-              _username = value;
+              _username = value.replaceAll(' ', '');
             },
           ),
           TextButton(onPressed: apply, child: const Text("Apply"))
@@ -97,8 +96,8 @@ class _ControllerState extends State<Controller> {
     _token = json.decode(r!.body)['token'];
 
     //decode token
-    _storage.write(key: "username", value: _username);
-    _storage.write(key: "token", value: _token);
+    await _storage.write(key: "username", value: _username);
+    await _storage.write(key: "token", value: _token);
     Fluttertoast.showToast(msg: "$_token");
     setState(() {});
   }
@@ -161,18 +160,22 @@ class _ControllerState extends State<Controller> {
 
   Future<http.Response?> sendHTTPRequest(
       String path, String body, METHOD method) async {
-    final _secret = 'secret';
-    final nonce = DateTime.now().microsecondsSinceEpoch.toString();
-    /*
-    var hs256 = (_secret != null) ? Hmac(sha256, hex.decode(_secret)) : null;
-    final signature = (_secret != null)
-        ? hs256!.convert(utf8.encode("$path$nonce$body"))
-        : null; //hex string
-        */
+    final nonce = (DateTime.now().microsecondsSinceEpoch / 1000000).toString();
+    var signature = '';
+    if (_token != null) {
+      final _secret = _token;
+      List<int> secretBytes = utf8.encode(_secret);
+      List<int> sigBytes = utf8.encode("$path$nonce$body");
+      var sha = new Hmac(sha256, secretBytes);
+      signature = sha.convert(sigBytes).toString();
+      Fluttertoast.showToast(msg: "token?");
+    } else {
+      Fluttertoast.showToast(msg: "no token");
+    }
     final header = <String, String>{
       'Content-Type': 'application/json; charset=UTF-8',
       'nonce': nonce,
-      //'signature': (_secret != null) ? "$signature" : ''
+      'signature': (_token != null) ? "$signature" : ''
     };
     try {
       if (method == METHOD.POST) {
