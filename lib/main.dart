@@ -93,11 +93,11 @@ class _ControllerState extends State<Controller> {
         }),
         METHOD.POST);
 
-    if(r!.statusCode == 409){
+    if (r!.statusCode == 409) {
       Fluttertoast.showToast(msg: "註冊過了!");
-    }else if(r.statusCode == 500){
+    } else if (r.statusCode == 500) {
       Fluttertoast.showToast(msg: "內部錯誤");
-    }else if(r.statusCode == 201){
+    } else if (r.statusCode == 201) {
       //decode data with secret
       _token = json.decode(r.body)['token'];
 
@@ -111,10 +111,14 @@ class _ControllerState extends State<Controller> {
 
   Widget _buildGrid() {
     return GridView(
-        gridDelegate: SliverGridDelegateWithMaxCrossAxisExtent(
-            maxCrossAxisExtent: 240
-        ),
-        children: [_buttonBuilder('up', Icons.arrow_upward),_buttonBuilder('stop', Icons.stop),_buttonBuilder('down', Icons.arrow_downward),_buttonBuilder('lock', Icons.lock)],
+      gridDelegate:
+          SliverGridDelegateWithMaxCrossAxisExtent(maxCrossAxisExtent: 240),
+      children: [
+        _buttonBuilder('up', Icons.arrow_upward),
+        _buttonBuilder('stop', Icons.stop),
+        _buttonBuilder('down', Icons.arrow_downward),
+        _buttonBuilder('lock', Icons.lock)
+      ],
     );
   }
 
@@ -126,14 +130,14 @@ class _ControllerState extends State<Controller> {
     );
   }
 
-  void gateAction (String op)async {
-    var r= await sendHTTPRequest('/gate_op',
+  void gateAction(String op) async {
+    var r = await sendHTTPRequest('/gate_op',
         jsonEncode(<String, String>{'name': _username, 'op': op}), METHOD.POST);
-    if(r!.statusCode == 403){
+    if (r!.statusCode == 403) {
       Fluttertoast.showToast(msg: "不給你用!");
-    }else if(r.statusCode == 400){
+    } else if (r.statusCode == 400) {
       Fluttertoast.showToast(msg: "??????????");
-    }else if(r.statusCode == 200){
+    } else if (r.statusCode == 200) {
       Fluttertoast.showToast(msg: "OK!");
     }
   }
@@ -250,25 +254,25 @@ class _AdminPageState extends State<AdminPage> {
             child: ListTile(
               title: Text(user['name']),
               subtitle: Text(user['zone']),
-              trailing: Icon((user['activated'] == -1)
-                  ? Icons.priority_high
-                  : (user['activated'] == 0)
-                      ? Icons.close
-                      : (user['expDate'] * 1000000 < DateTime.now().microsecondsSinceEpoch)
-                          ? Icons.date_range
-                          : Icons.done,
-              color: (user['activated'] == 1 && user['expDate'] * 1000000 > DateTime.now().microsecondsSinceEpoch) ? Colors.green : Colors.red,),
-
+              trailing: Icon(
+                (user['activated'] == -1)
+                    ? Icons.priority_high
+                    : (user['activated'] == 0)
+                        ? Icons.close
+                        : (user['expDate'] * 1000000 <
+                                DateTime.now().microsecondsSinceEpoch)
+                            ? Icons.date_range
+                            : Icons.done,
+                color: (user['activated'] == 1 &&
+                        user['expDate'] * 1000000 >
+                            DateTime.now().microsecondsSinceEpoch)
+                    ? Colors.green
+                    : Colors.red,
+              ),
             ),
           )));
     }
     return ListView(children: userList);
-  }
-
-  void deleteUser(String name) async {
-    await widget.sendHTTPRequest("/delete",
-        jsonEncode({"name": widget.username, "guest": name}), METHOD.POST);
-    refreshList();
   }
 }
 
@@ -299,6 +303,7 @@ class _EditUserPageState extends State<EditUserPage> {
   var zone;
   var activated;
   var expDate;
+  bool deleteCheck = false;
 
   @override
   Widget build(BuildContext context) {
@@ -311,7 +316,8 @@ class _EditUserPageState extends State<EditUserPage> {
           actions: [
             Switch(
                 value: (activated == 1) ? true : false,
-                activeColor: Colors.red,
+                activeColor: Colors.green,
+                inactiveThumbColor: Colors.red,
                 onChanged: (value) {
                   setState(() {
                     activated = (value == true) ? 1 : 0;
@@ -363,7 +369,11 @@ class _EditUserPageState extends State<EditUserPage> {
                     : DateTime.fromMicrosecondsSinceEpoch(
                         widget.expDate.round() * 1000000),
               ),
-              TextButton(onPressed: save, child: const Text("Save changes"))
+              TextButton(onPressed: save, child: const Text("Save changes")),
+              TextButton(
+                  onPressed: deleteUser,
+                  child:
+                      Text("Delete user", style: TextStyle(color: Colors.red)))
             ],
           ),
         ));
@@ -384,5 +394,18 @@ class _EditUserPageState extends State<EditUserPage> {
         METHOD.POST);
     super.widget.refreshList();
     Navigator.pop(context);
+  }
+
+  void deleteUser() async {
+    if (!deleteCheck) {
+      deleteCheck = true;
+    } else {
+      await widget.sendHTTPRequest(
+          "/delete",
+          jsonEncode({"name": widget.username, "guest": widget.name}),
+          METHOD.POST);
+      super.widget.refreshList();
+      Navigator.pop(context);
+    }
   }
 }
