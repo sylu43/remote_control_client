@@ -73,12 +73,12 @@ class _ControllerState extends State<Controller> {
           TextFormField(
             textInputAction: TextInputAction.next,
             decoration: const InputDecoration(
-                labelText: "Your username:", filled: true),
+                labelText: "你是誰?", filled: true),
             onChanged: (value) {
               _username = value.replaceAll(' ', '');
             },
           ),
-          TextButton(onPressed: apply, child: const Text("Apply"))
+          TextButton(onPressed: apply, child: const Text("註冊"))
         ],
       ),
     );
@@ -89,7 +89,7 @@ class _ControllerState extends State<Controller> {
         "/register",
         jsonEncode({
           "name": _username,
-          "zone": "test",
+          "zone": "guest",
         }),
         METHOD.POST);
 
@@ -105,7 +105,7 @@ class _ControllerState extends State<Controller> {
       await _storage.write(key: "username", value: _username);
       await _storage.write(key: "token", value: _token);
       setState(() {});
-      Fluttertoast.showToast(msg: "註冊成功!");
+      Fluttertoast.showToast(msg: "註冊成功!\n請聯絡管理員審核");
     }
   }
 
